@@ -44,8 +44,9 @@ void usage() {
 }
 
 /** Pass off function to handle incoming clients requests */
-void serve_client() { 
+void serve_client(char* client_id, int client_sd) { 
     // TODO 
+    printf("Serving %s:%d\n", client_id, client_sd);
 }
 
 int main(int argc, char* argv[]) {
@@ -108,10 +109,9 @@ int main(int argc, char* argv[]) {
         }
 
         inet_ntop(AF_INET6, &(client.sin6_addr), addr6_str, sizeof(addr6_str));
-        printf("Serving %s:%i\n", addr6_str, ntohs(client.sin6_port));
-
-        // Server client 
-        serve_client(addr6_str, client_sd);
+        //printf("Serving %s:%i\n", addr6_str, ntohs(client.sin6_port));
+ 
+        serve_client(addr6_str, client_sd); // Handle client request
         close(client_sd); // parent closes connection with served client 
     }
 

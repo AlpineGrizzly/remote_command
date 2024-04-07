@@ -109,7 +109,6 @@ int main(int argc, char* argv[]) {
     delay  = atoi(argv[Delay]);
     cmd    = argv[Cmd];
 
-
     // Initiate connection to server
     sd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
     if (sd == -1) { 
@@ -130,6 +129,9 @@ int main(int argc, char* argv[]) {
     }
     printf("Successfully connected to %s! --> %d\n", s_ip, sd);
 
+    // TODO Send the command request to the server to execute
+
+    // TODO Listen for reply from server 
 
     // Close connection to server
     close(sd);
