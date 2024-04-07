@@ -28,6 +28,14 @@
 // cmd    - Command to execute remotely on server
 enum Args{None, S_name, S_port, Count, Delay, Cmd};
 
+// Network defines
+// TODO TCP concurrent currently implemented - need to add define toggle for udp iterative client
+
+#define BUFSIZE 256 // Buffer size limiit for communicating with server
+
+// Command messages
+#define RCEND "rcend"
+
 /**
  * usage
  * 
@@ -93,12 +101,15 @@ int main(int argc, char* argv[]) {
     struct sockaddr_in6 server, client;
     int sd; 
     struct hostent *lh;
+    size_t mlen; // Contains size of message in bytes
+    char sbuf[BUFSIZE], cbuf[BUFSIZE]; // Server and Client message buffers respectively
 
     // Parse arguments 
     if (argc != NUM_ARGS) { 
         usage();
     }
     
+    // Do hostname lookup for corresponding ipv6 address
     if (!host2ipv6(argv[S_name], s_ip)) { 
         printf("Failed to find ipv6 for %s\n", argv[S_name]);
         exit(0);
@@ -111,7 +122,7 @@ int main(int argc, char* argv[]) {
 
     // Initiate connection to server
     sd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
-    if (sd == -1) { 
+    if (sd < 0) { 
         printf("Unable to initialize socket!\n");
         exit(0);
     }
@@ -129,11 +140,31 @@ int main(int argc, char* argv[]) {
     }
     printf("Successfully connected to %s! --> %d\n", s_ip, sd);
 
-    // TODO Send the command request to the server to execute
+    // Send the command request to the server to execute
+    sprintf(cbuf, "%s", cmd);
 
-    // TODO Delay and count logic will be here in a for loop for number of request exceution times
+    printf("Executing '%s' %d times %d seconds apart\n", cbuf, count, delay);
+    // Delay and count logic will be here in a for loop for number of request exceution times
+    for (int i = 0; i < count; i++) { 
+        // send command to server 
+        printf("Requesting command: [%ld]'%s'\n", strlen(cbuf), cbuf);
+        if (send(sd, cbuf, strlen(cbuf), 0) != strlen(cbuf)) { 
+            printf("Unable to send command to server\n");
+            break;
+        }
+        
+        // TODO Listen for reply from server 
 
-    // TODO Listen for reply from server 
+        sleep(delay); // Sleep for delay in seconds
+    }
+    
+    // send kill message
+    if (send(sd, RCEND, sizeof RCEND, 0) != sizeof RCEND) { 
+        printf("Unable to send client_done to server\n");
+        close(sd);
+        exit(0);
+    }
+    printf("Client done!\n");
 
     // Close connection to server
     close(sd);

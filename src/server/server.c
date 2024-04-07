@@ -23,9 +23,16 @@
 // Network defines
 #define QUEUELEN 5
 
+// TODO TCP concurrent currently implemented - need to add define toggle for udp iterative server
+
 // Arg parsing
 #define NUM_ARGS 2
 enum Args{None, Port};
+
+#define BUFSIZE 256 
+
+// Command messages
+#define RCEND "rcend"
 
 /**
  * usage
@@ -45,9 +52,31 @@ void usage() {
 
 /** Pass off function to handle incoming clients requests */
 void serve_client(char* client_id, int client_sd) { 
-    // TODO 
+    char sbuf[BUFSIZE], cbuf[BUFSIZE];
+    size_t mlen; 
+    int status; // Holds status of executing requested command from client
+    
     printf("Serving %s:%d\n", client_id, client_sd);
-    // TODO Will continue listening for executions until killed 
+
+    // Receive command from client
+    while ((mlen = read(client_sd, cbuf, BUFSIZE)) > 0) { 
+        cbuf[mlen] = 0; // Null terminate
+        printf("Message is [%ld]%s\n", mlen, cbuf);
+        
+        if (!strcmp(cbuf, RCEND)) { 
+            printf("Session terminated\n");
+            break; // Stop receving commands when client is done
+        }
+
+        // Otherwise execute command
+        printf("Executing '%s'\n", cbuf);
+        printf("**-----------------------**\n");
+        system(cbuf);
+        printf("**-----------------------**\n\n");
+        
+        memset(cbuf, 0, sizeof cbuf); // Clear the buffer
+    }
+    printf("All done!\n\n");
 }
 
 int main(int argc, char* argv[]) {
