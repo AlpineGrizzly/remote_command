@@ -47,6 +47,7 @@ void usage() {
 void serve_client(char* client_id, int client_sd) { 
     // TODO 
     printf("Serving %s:%d\n", client_id, client_sd);
+    // TODO Will continue listening for executions until killed 
 }
 
 int main(int argc, char* argv[]) {

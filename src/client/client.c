@@ -48,7 +48,7 @@ void usage() {
 }
 
 int host2ipv6(char *hostname, char *dst) { 
-struct addrinfo hints, *res, *p;
+    struct addrinfo hints, *res, *p;
     int status;
 
     // Set up hints to get IPv6 addresses
@@ -62,7 +62,7 @@ struct addrinfo hints, *res, *p;
         return 0;
     }
 
-    printf("IPv6 addresses for %s:\n\n", hostname);
+    //printf("IPv6 addresses for %s:\n\n", hostname);
 
     // Loop through all the results and print the IP address
     for (p = res; p != NULL; p = p->ai_next) {
@@ -130,6 +130,8 @@ int main(int argc, char* argv[]) {
     printf("Successfully connected to %s! --> %d\n", s_ip, sd);
 
     // TODO Send the command request to the server to execute
+
+    // TODO Delay and count logic will be here in a for loop for number of request exceution times
 
     // TODO Listen for reply from server 
 
