@@ -188,6 +188,7 @@ int main(int argc, char* argv[]) {
     int client_len = sizeof(client);
 
     // Main listen and server loop
+    pid_t child; 
     while(1) {
         printf("Listening for clients...\n");
 
@@ -200,12 +201,14 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        inet_ntop(AF_INET6, &(client.sin6_addr), addr6_str, sizeof(addr6_str));
-        //printf("Serving %s:%i\n", addr6_str, ntohs(client.sin6_port));
- 
-        serve_client(addr6_str, client_sd); // Handle client request
+        if ((child = fork()) == 0) { 
+            close(sd); // Close listening socket for child
+            inet_ntop(AF_INET6, &(client.sin6_addr), addr6_str, sizeof(addr6_str));
+            serve_client(addr6_str, client_sd); // Handle client request
+            printf("--------------------------------------------\n");
+            exit(0);
+        }
         close(client_sd); // parent closes connection with served client 
-        printf("--------------------------------------------\n");
     }
 
     close(sd);
