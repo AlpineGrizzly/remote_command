@@ -35,6 +35,8 @@ enum Args{None, S_name, S_port, Count, Delay, Cmd};
 
 // Command messages
 #define RCEND "rcend"
+#define ACK "ack"
+
 
 /**
  * usage
@@ -102,7 +104,9 @@ int main(int argc, char* argv[]) {
     int sd; 
     struct hostent *lh;
     size_t mlen; // Contains size of message in bytes
-    char sbuf[BUFSIZE], cbuf[BUFSIZE]; // Server and Client message buffers respectively
+    char sbuf[BUFSIZE+sizeof(uint64_t)], cbuf[BUFSIZE]; // Server and Client message buffers respectively
+    uint64_t len_field; // used to store length received from server
+    char stime[BUFSIZE]; // Pointer to server time
 
     // Parse arguments 
     if (argc != NUM_ARGS) { 
@@ -153,7 +157,31 @@ int main(int argc, char* argv[]) {
             break;
         }
         
-        // TODO Listen for reply from server 
+        // Listen for reply from server with time 
+        if ((mlen = read(sd, stime, sizeof stime)) < 0) { 
+            printf("Unable to receive server time\n");
+            break;
+        }
+        printf("Time at server: %s", stime);
+
+        // ack
+        if (send(sd, ACK, strlen(ACK), 0) != strlen(ACK)) { 
+            printf("Unable to send ack to server\n");
+            break;
+        }
+        
+        // Listen for reply from server with execution result
+        if ((mlen = read(sd, sbuf, sizeof sbuf)) > 0) { 
+            // Grab length
+            memcpy(&len_field, sbuf, sizeof(uint64_t)); // get the length
+
+            if (mlen != len_field) { 
+                // we have an issue retransmit
+            } else { 
+                // Display information from server on client size
+                printf("Output:\n%s\n\n", sbuf+sizeof(uint64_t));
+            }
+        }
 
         sleep(delay); // Sleep for delay in seconds
     }

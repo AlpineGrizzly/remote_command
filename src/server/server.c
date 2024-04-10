@@ -12,6 +12,7 @@
 #include <stdlib.h> 
 #include <string.h>
 #include <stdint.h>
+#include <time.h>
 
 // Socket libraries
 #include <unistd.h>
@@ -33,6 +34,7 @@ enum Args{None, Port};
 
 // Command messages
 #define RCEND "rcend"
+#define ACK "ack"
 
 /**
  * usage
@@ -52,31 +54,91 @@ void usage() {
 
 /** Pass off function to handle incoming clients requests */
 void serve_client(char* client_id, int client_sd) { 
-    char sbuf[BUFSIZE], cbuf[BUFSIZE];
+    char sbuf[BUFSIZE], cbuf[BUFSIZE], command[3*BUFSIZE], tempfile[BUFSIZE+16]; // 16 for appending string to command
     size_t mlen; 
     int status; // Holds status of executing requested command from client
-    
-    printf("Serving %s:%d\n", client_id, client_sd);
+    time_t rawtime; 
+    struct tm *timeinfo;
+    char *time_str; // holds pointer to ascii string of time
 
     // Receive command from client
     while ((mlen = read(client_sd, cbuf, BUFSIZE)) > 0) { 
+        char c;
+        int i = 0;
         cbuf[mlen] = 0; // Null terminate
-        printf("Message is [%ld]%s\n", mlen, cbuf);
-        
+
+        // Get the current time
+        time(&rawtime);
+        timeinfo = localtime(&rawtime);
+
+        // Check for rcend input from user
         if (!strcmp(cbuf, RCEND)) { 
-            printf("Session terminated\n");
-            break; // Stop receving commands when client is done
+            printf("Time at server: %sClient IP:%s\nStatus: closed\n", asctime(timeinfo), client_id);
+            return; // Stop receving commands when client is done
+        }
+        
+        // Add redirect to store command output into file
+        sprintf(tempfile, "client_%s.temp", client_id); // Get unique client temp
+        sprintf(command, "%s > %s", cbuf, tempfile); // store to temp file with ip of client ip address
+        printf("Time at server: %sClient IP: %s\nCommand: %s\nStatus: connected\n", asctime(timeinfo), client_id, cbuf);
+
+        // Send server time to client
+        time_str = asctime(timeinfo);
+        if (send(client_sd, time_str, strlen(time_str), 0) != strlen(time_str)) { 
+            printf("Unable to send time to client\n");
+            break;
         }
 
-        // Otherwise execute command
-        printf("Executing '%s'\n", cbuf);
-        printf("**-----------------------**\n");
-        system(cbuf);
-        printf("**-----------------------**\n\n");
+        // Receive ack 
+        if ((mlen = read(client_sd, sbuf, sizeof sbuf)) > 0) {
+            sbuf[mlen] = 0; // Null terminate
+            if (strcmp(sbuf, ACK) != 0) { 
+                printf("Did not receive ack from client!\n%s\n", sbuf);
+                return;
+            } 
+        }
+
+        // execute the command
+        status = system(command); 
+
+        if (status < 0) { // get status of executing command
+            printf("Command failed execution!\n");
+            return;
+        }
         
+        // Otherwise, if successful, read output from file
+        FILE *f = fopen(tempfile, "r");
+
+        if (!f) { 
+            printf("Failed to open temp file %s\n", tempfile);
+            fclose(f);
+            return;
+        }
+
+        // Diplay to server and write into buffer to send to client
+        while ((c = (char)fgetc(f)) != EOF && i < sizeof sbuf - 1) {
+            sbuf[i++] = c;
+        }
+        sbuf[i] = 0; // NULL TERMINATE
+        printf("Execution Output:\n%s\n\n", sbuf);
+        fclose(f);
+
+        // Send time of execution and result to client
+        // first 8 bytes are length, rest is message
+        char reply[BUFSIZE+sizeof(uint64_t)];
+        uint64_t output_size = (uint64_t)strlen(sbuf)+sizeof(uint64_t);
+        memcpy(reply, &output_size, sizeof(uint64_t));
+        strcpy(reply + sizeof(uint64_t), sbuf);
+
+        // Write data to client
+        //printf("reply [%ld] %s\n", output_size, reply+sizeof(uint64_t));
+        if (write(client_sd, reply, output_size) < 0) { 
+            printf("Error sending result to client\n");
+            return;
+        }
+
         memset(cbuf, 0, sizeof cbuf); // Clear the buffer
     }
-    printf("All done!\n\n");
 }
 
 int main(int argc, char* argv[]) {
@@ -143,6 +205,7 @@ int main(int argc, char* argv[]) {
  
         serve_client(addr6_str, client_sd); // Handle client request
         close(client_sd); // parent closes connection with served client 
+        printf("--------------------------------------------\n");
     }
 
     close(sd);
