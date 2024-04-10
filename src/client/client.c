@@ -145,18 +145,20 @@ int main(int argc, char* argv[]) {
     printf("Successfully connected to %s! --> %d\n", s_ip, sd);
 
     // Send the command request to the server to execute
-    sprintf(cbuf, "%s", cmd);
+    sprintf(cbuf, "%d,%d,%s", count, delay, cmd);
 
-    printf("Executing '%s' %d times %d seconds apart\n", cbuf, count, delay);
+    printf("Executing '%s' %d times %d seconds apart\n", cmd, count, delay);
     // Delay and count logic will be here in a for loop for number of request exceution times
-    for (int i = 0; i < count; i++) { 
-        // send command to server 
-        printf("Requesting command: [%ld]'%s'\n", strlen(cbuf), cbuf);
-        if (send(sd, cbuf, strlen(cbuf), 0) != strlen(cbuf)) { 
-            printf("Unable to send command to server\n");
-            break;
-        }
-        
+    // send command to server 
+    printf("Requesting command: [%ld]'%s'\n", strlen(cbuf), cbuf);
+    if (send(sd, cbuf, strlen(cbuf), 0) != strlen(cbuf)) { 
+        printf("Unable to send command to server\n");
+        close(sd);
+        exit(0);
+    }
+
+    // Listen for reply from server with time 
+    for (int i = 0; i < count; i++) {
         // Listen for reply from server with time 
         if ((mlen = read(sd, stime, sizeof stime)) < 0) { 
             printf("Unable to receive server time\n");
@@ -182,8 +184,6 @@ int main(int argc, char* argv[]) {
                 printf("Output:\n%s\n\n", sbuf+sizeof(uint64_t));
             }
         }
-
-        sleep(delay); // Sleep for delay in seconds
     }
     
     // send kill message

@@ -54,36 +54,64 @@ void usage() {
 
 /** Pass off function to handle incoming clients requests */
 void serve_client(char* client_id, int client_sd) { 
-    char sbuf[BUFSIZE], cbuf[BUFSIZE], command[3*BUFSIZE], tempfile[BUFSIZE+16]; // 16 for appending string to command
+    char sbuf[BUFSIZE], cbuf[BUFSIZE], command[BUFSIZE], sys_command[128], tempfile[128]; // 16 for appending string to command
     size_t mlen; 
     int status; // Holds status of executing requested command from client
     time_t rawtime; 
     struct tm *timeinfo;
     char *time_str; // holds pointer to ascii string of time
+    char *temp;
+    int ecount, delay;
+    
+    printf("\nConnected to %s\n", client_id);
+    
+    // Receive parameter string from client and tokenize
+    if ((mlen = read(client_sd, cbuf, BUFSIZE)) > 0) { 
+        cbuf[mlen] = 0;
 
-    // Receive command from client
-    while ((mlen = read(client_sd, cbuf, BUFSIZE)) > 0) { 
+        printf("Received %s\n", cbuf);
+
+        //  otherwise tokenize and load parameters
+        temp = strtok(cbuf, ","); // Process execution count
+        ecount = atoi(temp);
+        
+        temp = strtok(NULL, ","); // Process delay 
+        delay = atoi(temp);
+
+        temp = strtok(NULL, ","); // Process command 
+        strcpy(command, temp); 
+        strcpy(sys_command, temp);
+
+    } else { 
+        printf("Did not receive parameter string\n");
+        return;
+    }
+
+    // Set up for loop of executing instructions
+    sprintf(tempfile, "client_%s.temp", client_id); // Get unique client temp
+
+    // Add redirect to store command output into file
+    strcat(command, ">");
+    strcat(command, tempfile);
+
+    printf("Executing %s %d times for %d seconds\n", command, ecount, delay);
+    for (int i = 0; i < ecount; i++) { 
         char c;
-        int i = 0;
-        cbuf[mlen] = 0; // Null terminate
+        int j = 0;
 
         // Get the current time
         time(&rawtime);
         timeinfo = localtime(&rawtime);
+        time_str = asctime(timeinfo);
 
         // Check for rcend input from user
         if (!strcmp(cbuf, RCEND)) { 
-            printf("Time at server: %sClient IP:%s\nStatus: closed\n", asctime(timeinfo), client_id);
+            printf("Time at server: %sClient IP:%s\nStatus: closed\n", time_str, client_id);
             return; // Stop receving commands when client is done
         }
-        
-        // Add redirect to store command output into file
-        sprintf(tempfile, "client_%s.temp", client_id); // Get unique client temp
-        sprintf(command, "%s > %s", cbuf, tempfile); // store to temp file with ip of client ip address
-        printf("Time at server: %sClient IP: %s\nCommand: %s\nStatus: connected\n", asctime(timeinfo), client_id, cbuf);
+        printf("Time at server: %sClient IP: %s\nCommand: %s\nStatus: connected\n", time_str, client_id, sys_command);
 
         // Send server time to client
-        time_str = asctime(timeinfo);
         if (send(client_sd, time_str, strlen(time_str), 0) != strlen(time_str)) { 
             printf("Unable to send time to client\n");
             break;
@@ -116,10 +144,10 @@ void serve_client(char* client_id, int client_sd) {
         }
 
         // Diplay to server and write into buffer to send to client
-        while ((c = (char)fgetc(f)) != EOF && i < sizeof sbuf - 1) {
-            sbuf[i++] = c;
+        while ((c = (char)fgetc(f)) != EOF && j < sizeof sbuf - 1) {
+            sbuf[j++] = c;
         }
-        sbuf[i] = 0; // NULL TERMINATE
+        sbuf[j] = 0; // NULL TERMINATE
         printf("Execution Output:\n%s\n\n", sbuf);
         fclose(f);
 
@@ -137,8 +165,11 @@ void serve_client(char* client_id, int client_sd) {
             return;
         }
 
+        sleep(delay);
         memset(cbuf, 0, sizeof cbuf); // Clear the buffer
     }
+    printf("Time at server: %sClient IP:%s\nStatus: closed\n", time_str, client_id);
+    return;
 }
 
 int main(int argc, char* argv[]) {
