@@ -94,6 +94,8 @@ void serve_client(char* client_id, int client_sd) {
     strcat(command, ">");
     strcat(command, tempfile);
 
+    int flags = fcntl(client_sd, F_GETFL, 0); // Get flags
+
     printf("Executing %s %d times for %d seconds\n", command, ecount, delay);
     for (int i = 0; i < ecount; i++) { 
         char c;
@@ -120,10 +122,14 @@ void serve_client(char* client_id, int client_sd) {
         // Receive ack 
         if ((mlen = read(client_sd, sbuf, sizeof sbuf)) > 0) {
             sbuf[mlen] = 0; // Null terminate
-            if (strcmp(sbuf, ACK) != 0) { 
-                printf("Did not receive ack from client!\n%s\n", sbuf);
+            if (!strcmp(sbuf, RCEND)) { 
+                printf("Received RCEND from client\n");
+                printf("Time at server: %sClient IP:%s\nStatus: closed\n", time_str, client_id);
                 return;
-            } 
+            } else if (strcmp(sbuf, ACK)) { 
+                printf("Unknown command received from client...terminating --- %s\n", sbuf);
+                return;
+            }
         }
 
         // execute the command
@@ -153,7 +159,7 @@ void serve_client(char* client_id, int client_sd) {
 
         // Send time of execution and result to client
         // first 8 bytes are length, rest is message
-        char reply[BUFSIZE+sizeof(uint64_t)];
+        char reply[sizeof(sbuf)+sizeof(uint64_t)];
         uint64_t output_size = (uint64_t)strlen(sbuf)+sizeof(uint64_t);
         memcpy(reply, &output_size, sizeof(uint64_t));
         strcpy(reply + sizeof(uint64_t), sbuf);
@@ -164,8 +170,21 @@ void serve_client(char* client_id, int client_sd) {
             printf("Error sending result to client\n");
             return;
         }
-
-        sleep(delay);
+        
+        fcntl(client_sd, F_SETFL, flags | O_NONBLOCK); // Make nonblocking
+        for (int i = 0; i < delay; i++) { 
+            // Check periodically through sleep for a rcend command 
+            if ((mlen = read(client_sd, sbuf, sizeof sbuf)) > 0) {
+                sbuf[mlen] = 0; // Null terminate
+                if (!strcmp(sbuf, RCEND)) { 
+                    printf("Received RCEND from client\n");
+                    printf("Time at server: %sClient IP:%s\nStatus: closed\n", time_str, client_id);
+                    return;
+                }
+            }
+            sleep(i); // Otherwise night night
+        }
+        fcntl(client_sd, F_SETFL, flags); // Set back blocking flags
         memset(cbuf, 0, sizeof cbuf); // Clear the buffer
     }
     printf("Time at server: %sClient IP:%s\nStatus: closed\n", time_str, client_id);

@@ -19,6 +19,8 @@
 #include <net/if.h>
 #include <netdb.h>
 
+#include <poll.h>
+
 // Arg parsing
 #define NUM_ARGS 6
 // s_name - name of the server machine, 
@@ -157,31 +159,98 @@ int main(int argc, char* argv[]) {
         exit(0);
     }
 
+
+    // Polling declarations for checking stdin while waiting on reply from server
+    struct pollfd fds[2];
+    fds[0].fd = sd;
+    fds[0].events = POLLIN;
+    fds[1].fd = 0;
+    fds[1].events = POLLIN;
+
+    // Make read nonblocking
+    int flags = fcntl(sd, F_GETFL, 0);
+    fcntl(sd, F_SETFL, flags | O_NONBLOCK);
+
     // Listen for reply from server with time 
     for (int i = 0; i < count; i++) {
         // Listen for reply from server with time 
-        if ((mlen = read(sd, stime, sizeof stime)) < 0) { 
-            printf("Unable to receive server time\n");
-            break;
+        // Check for either stdin input or a reply from the server
+        printf("Waiting on time reply\n");
+        while(poll(fds, 2, -1) != -1) { 
+            // Stdin detected
+            if (fds[1].revents & POLLIN) { 
+                fgets(sbuf, 20, stdin);
+                sbuf[strcspn(sbuf, "\n")] = '\0'; // Remove newline character
+                printf("Input from user: %s\n", sbuf);
+
+                printf("%s == %s\n", sbuf, RCEND);
+
+                if (!strcmp(sbuf, RCEND)) { 
+                    // Send kill message and exit
+                    send(sd, RCEND, sizeof RCEND, 0);
+                    printf("Client terminating...\n");
+                    close(sd);
+                    exit(0);
+                }
+            } 
+
+            // Get time from socket
+            if (fds[0].revents & POLLIN) { 
+                mlen = read(sd, stime, sizeof stime);
+
+                if (mlen < 0) { 
+                    printf("Error occurred while reading data\n");
+                    exit(0);
+                }
+                printf("Time at server: %s", stime);
+                break;
+            }
         }
-        printf("Time at server: %s", stime);
 
         // ack
         if (send(sd, ACK, strlen(ACK), 0) != strlen(ACK)) { 
             printf("Unable to send ack to server\n");
             break;
         }
-        
-        // Listen for reply from server with execution result
-        if ((mlen = read(sd, sbuf, sizeof sbuf)) > 0) { 
-            // Grab length
-            memcpy(&len_field, sbuf, sizeof(uint64_t)); // get the length
 
-            if (mlen != len_field) { 
-                // we have an issue retransmit
-            } else { 
-                // Display information from server on client size
-                printf("Output:\n%s\n\n", sbuf+sizeof(uint64_t));
+        // Check for either stdin input or a reply from the server
+        printf("waiting on execution reply\n");
+        while(poll(fds, 2, -1) != -1) {             
+            // Stdin detected
+            if (fds[1].revents & POLLIN) { 
+                fgets(sbuf, 20, stdin);
+                sbuf[strcspn(sbuf, "\n")] = '\0'; // Remove newline character
+                printf("Input from user: %s\n", sbuf);
+
+                printf("%s == %s\n", sbuf, RCEND);
+
+                if (!strcmp(sbuf, RCEND)) { 
+                    // Send kill message and exit
+                    send(sd, RCEND, sizeof RCEND, 0);
+                    printf("Client terminating...\n");
+                    close(sd);
+                    exit(0);
+                }
+            } 
+
+            // Socket data detected
+            // Listen for reply from server with execution result
+            if (fds[0].revents & POLLIN) { 
+                mlen = read(sd, sbuf, sizeof sbuf);
+
+                if (mlen < 0) { 
+                    printf("Error occurred while reading data\n");
+                    exit(0);
+                }
+
+                // Grab lengths
+                memcpy(&len_field, sbuf, sizeof(uint64_t)); // get the length
+
+                if (mlen == len_field) {  
+                    // Display information from server on client size
+                    printf("Output:\n%s\n\n", sbuf+sizeof(uint64_t));
+                    break;
+                }
             }
         }
     }
