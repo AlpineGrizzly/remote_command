@@ -30,7 +30,7 @@
 #define NUM_ARGS 2
 enum Args{None, Port};
 
-#define BUFSIZE 256 
+#define BUFSIZE 1024 
 
 // Command messages
 #define RCEND "rcend"

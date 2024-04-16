@@ -33,7 +33,7 @@ enum Args{None, S_name, S_port, Count, Delay, Cmd};
 // Network defines
 // TODO TCP concurrent currently implemented - need to add define toggle for udp iterative client
 
-#define BUFSIZE 256 // Buffer size limiit for communicating with server
+#define BUFSIZE 1024 // Buffer size limiit for communicating with server
 
 // Command messages
 #define RCEND "rcend"
