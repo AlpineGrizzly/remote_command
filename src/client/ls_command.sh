@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./client localhost 5000 10 3 "ls -l" 
+./client ::1 5000 10 3 "ls -l" 

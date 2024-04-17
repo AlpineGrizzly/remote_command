@@ -116,11 +116,12 @@ int main(int argc, char* argv[]) {
     }
     
     // Do hostname lookup for corresponding ipv6 address
-    if (!host2ipv6(argv[S_name], s_ip)) { 
-        printf("Failed to find ipv6 for %s\n", argv[S_name]);
-        exit(0);
-    }
-    printf("Found %s for %s\n", s_ip, argv[S_name]);
+    //if (!host2ipv6(argv[S_name], s_ip)) { 
+    //    printf("Failed to find ipv6 for %s\n", argv[S_name]);
+    //    exit(0);
+    //}
+    //printf("Found %s for %s\n", s_ip, argv[S_name]);
+    strcpy(s_ip, argv[S_name]);
     s_port = atoi(argv[S_port]);
     count  = atoi(argv[Count]);
     delay  = atoi(argv[Delay]);
