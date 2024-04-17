@@ -198,6 +198,7 @@ int main(int argc, char* argv[]) {
             // Get time from socket
             if (fds[0].revents & POLLIN) { 
                 mlen = read(sd, stime, sizeof stime);
+                stime[mlen] = 0;
 
                 if (mlen < 0) { 
                     printf("Error occurred while reading data\n");
@@ -209,7 +210,7 @@ int main(int argc, char* argv[]) {
         }
 
         // ack
-        if (send(sd, ACK, strlen(ACK), 0) != strlen(ACK)) { 
+        if (send(sd, ACK, sizeof ACK, 0) != sizeof ACK) { 
             printf("Unable to send ack to server\n");
             break;
         }
@@ -238,6 +239,7 @@ int main(int argc, char* argv[]) {
             // Listen for reply from server with execution result
             if (fds[0].revents & POLLIN) { 
                 mlen = read(sd, sbuf, sizeof sbuf);
+                sbuf[mlen] = 0;
 
                 if (mlen < 0) { 
                     printf("Error occurred while reading data\n");
